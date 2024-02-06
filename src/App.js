@@ -1,26 +1,55 @@
 import { useEffect, useState } from 'react';
 
 export default function App() {
-  const [amount, setAmout] = useState(1);
+  const [amount, setAmount] = useState(1);
   const [from, setFrom] = useState('PLN');
   const [to, setTo] = useState('CZK');
   const [exchange, setExchange] = useState('');
+  const [error, setError] = useState('');
+  const [inputError, setInputError] = useState('');
 
   useEffect(
     function () {
       async function getCurrency() {
-        const res = await fetch(
-          `https://api.frankfurter.app/latest?amount=${amount}&from=${from}&to=${to}`
-        );
-        const data = await res.json();
-        setExchange(data.rates[to]);
+        try {
+          // Checking the validity of the input value
+          if (!amount || isNaN(amount) || amount <= 0) {
+            setInputError('Invalid amount.');
+            throw new Error('Invalid amount.');
+          }
+
+          const res = await fetch(
+            `https://api.frankfurter.app/latest?amount=${amount}&from=${from}&to=${to}`
+          );
+          if (!res.ok) {
+            throw new Error('Network response was not ok.');
+          }
+          const data = await res.json();
+
+          // Validation of API data
+          if (!data || !data.rates || !data.rates[to]) {
+            throw new Error('Invalid response format from API.');
+          }
+          setExchange(data.rates[to]);
+          setInputError('');
+          setError('');
+        } catch (error) {
+          // Error handling
+          console.error('Error fetching data:', error.message);
+          if (inputError) {
+            setError('');
+          } else {
+            setError('Something went wrong, please try again later.');
+          }
+          setExchange('');
+        }
       }
 
       if (from === to) return setExchange(amount);
 
       getCurrency();
     },
-    [amount, from, to]
+    [amount, from, to, inputError]
   );
 
   return (
@@ -32,9 +61,15 @@ export default function App() {
         <input
           type="text"
           value={amount}
-          onChange={(e) => setAmout(Number(e.target.value))}
+          onChange={(e) => {
+            setAmount(Number(e.target.value));
+            setInputError('');
+          }}
           className="w-full p-2 rounded-md focus:outline-0 mb-4 text-center border focus:border-neutral-500"
         />
+        {inputError && (
+          <p className="text-center text-red-500 mb-4">{inputError}</p>
+        )}
         <div className="flex gap-4 mb-4">
           <select
             value={from}
@@ -57,6 +92,7 @@ export default function App() {
             <option value="GBP">🇬🇧 GBP</option>
           </select>
         </div>
+        {error && <p className="text-center text-red-500 mb-4">{error}</p>}
         <p className="text-center text-lg">
           {amount} {from} is currently {exchange} {to}
         </p>
